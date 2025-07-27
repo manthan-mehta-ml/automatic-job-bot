@@ -5,8 +5,8 @@ import time
 import csv
 import re
 from jobspy import scrape_jobs
-API_KEY = "AIzaSyAnFdJuk-0zUjl2b6Y6OQNq8EOlronsVa0"
-CX_ID = "b3556dd95f44948da"
+API_KEY = os.getenv("google_api_key")
+CX_ID = os.getenv("cx_id")
 
 def get_unique_word_diff(text1, text2):
     # Basic word tokenization (case-insensitive, alphanumeric)
