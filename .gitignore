@@ -1,0 +1,82 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+.venv/
+venv/
+env/
+ENV/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# PyCharm and VSCode
+.idea/
+.vscode/
+*.code-workspace
+
+# Logs and debug files
+*.log
+*.out
+*.err
+
+# OS and system files
+.DS_Store
+Thumbs.db
+
+# Python packaging
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Environment variables and secrets
+.env
+*.env
+*.secrets
+.env.*
+
+# Notebooks outputs (if saved separately)
+**/outputs/
+*.nbconvert.ipynb
+
+# Data files (optional, uncomment as needed)
+# *.csv
+# *.parquet
+# *.h5
+# *.sqlite
+# *.db
+
+# Models / Checkpoints
+*.pt
+*.pth
+*.h5
+*.joblib
+*.pkl
+
+# Cache
+.cache/
+*.mypy_cache/
+*.pytest_cache/
+__pypackages__/
+
+# S3 / AWS credentials
+.aws/
+
+# Latex auxiliary files (if using .tex resumes)
+*.aux
+*.log
+*.out
+*.toc
+*.synctex.gz
+*.pdf
+*.tex
+
+auto_apply.py
+*.csv
+find_job_urls.py
+find_jobs.py
+main.py
