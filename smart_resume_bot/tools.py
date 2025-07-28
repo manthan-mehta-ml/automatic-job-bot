@@ -8,6 +8,53 @@ from jobspy import scrape_jobs
 API_KEY = os.getenv("google_api_key")
 CX_ID = os.getenv("cx_id")
 
+
+import re
+
+def clean_latex_response(latex_str):
+    # Remove over-escaped characters
+    latex_str = latex_str.replace('\\textbackslash{}', '\\')
+    latex_str = latex_str.replace('\\{', '{').replace('\\}', '}')
+    latex_str = latex_str.replace('\\\\', '\\')  # collapse double slashes
+    return latex_str
+
+def escape_latex(text: str) -> str:
+    """
+    Escapes LaTeX special characters in a string to avoid compile errors.
+    Does NOT escape '%' if it's the start of a comment.
+    """
+    replacements = {
+        '\\': r'\\textbackslash{}',
+        '&': r'\&',
+        '$': r'\$',
+        '#': r'\#',
+        '_': r'\_',
+        '{': r'\{',
+        '}': r'\}',
+        '~': r'\textasciitilde{}',
+        '^': r'\textasciicircum{}',
+    }
+
+    escaped_lines = []
+    for line in text.splitlines():
+        # If '%' is used, split line into code and comment
+        if '%' in line:
+            code_part, comment_part = line.split('%', 1)
+            for original, replacement in replacements.items():
+                code_part = code_part.replace(original, replacement)
+            # Only escape % if it's not a comment
+            code_part = code_part.replace('%', r'\%')
+            escaped_lines.append(code_part + '%' + comment_part)
+        else:
+            for original, replacement in replacements.items():
+                line = line.replace(original, replacement)
+            line = line.replace('%', r'\%')  # safe to escape here
+            escaped_lines.append(line)
+
+    return '\n'.join(escaped_lines)
+
+
+
 def get_unique_word_diff(text1, text2):
     # Basic word tokenization (case-insensitive, alphanumeric)
     tokenize = lambda t: set(re.findall(r"\b\w+\b", t.lower()))
@@ -38,52 +85,86 @@ def get_recent_jobs():
     )
     return jobs.to_dict(orient='records')  # list of dicts
 
-def tailor_resume(jd_text, original_tex_file,output_file):
-    # print("jd text",jd_text)
+def tailor_resume(jd_text, original_tex_file, output_file):
+    print("jd length", len(jd_text))
+
     with open(original_tex_file, "r") as f:
-        resume_text = f.read().replace("\\", "\\\\")  # Escape LaTeX backslashes
-    response = client.chat.completions.create(model="gpt-4o",
-    messages=[
-        {"role": "system", "content": "You are a resume optimizer..."},
-        {"role": "user", "content": 
+        lines = f.readlines()
 
-f"""You are given a LaTeX resume file. Your task is to tailor it to the job description below.
+    # Split into preserved and editable parts
+    preserved_lines = lines[:82]
+    editable_lines = lines[82:]
+    preserved_text = ''.join(preserved_lines)
+    editable_text = ''.join(editable_lines)
 
-Only modify the following sections: **Experience**, **Skills**, and **Summary**.
+    # Prepare the prompt
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[
+            {
+                "role": "system",
+                "content": "You are a resume optimizer..."
+            },
+            {
+                "role": "user",
+                "content": rf"""You are given part of a LaTeX resume file. Your task is to tailor it to the job description below.
+
+Only modify the following sections: **Experience**, **Skills**, and **Summary**, **Education**
 
 Guidelines:
-- First extract keywords from the jd, and remove irrelevant sections.
-- Do no cut any sections including education or the name of the person to whom the resume belongs to.
-- Dont add full forms of whatever is mentioned in the resume.
-- Add or modify bullet points between job description, and the resume to ensure **at least 95% keyword match** with the job description.
-- For a ML Engineer role important key words would be [GenAI, Modeling, S3, AWS, docker, Software developent, SQL, Snowflake], and similar.
-- Make sure the new compiled resume has as many key words from job description as possible, but make sure the sentence that you compile should make sense.
-- You **must** increase the number of relevant, impactful sentences if the original resume is missing key qualifications.
-- Introduce new bullet points that reflect the responsibilities, technologies, and qualifications in the job description—even if they weren't originally listed.
-- Ensure that the resume fits in 1 page when compiled over a pdf, and any section is not cut.
-- Emphasize **measurable impact** (e.g., "reduced cost by 20%", "improved model AUC to 0.92").
-- Ensure valid LaTeX syntax: special characters like `$`, `%`, `_`, `&`, `#`, braces must be **escaped with a backslash** (`\`) so the file compiles without error.
-- Do **not** include any extra explanation, commentary, or formatting wrappers like ```latex or triple backticks.
-- Only return the final, complete LaTeX file as output.
-- Ensure that the number of sentences are not lesser in the new resume than the original resume.
-- After compiling make sure that the page length is not more than 1 page.
+- First extract keywords from the JD, and remove irrelevant content.
+- Keep **Education** and **Name** sections unchanged.
+- Do **not** convert LaTeX commands to text (e.g., `\documentclass` should remain LaTeX code).
+- DO NOT escape valid LaTeX commands like `\section`, `\item`, `\href`, `\textbf`, `\textit`, etc.
+- Ignore any new lines starting with '%' symbol as it signals a comment.
+- Don't wrap output in triple backticks or extra markers.
+- Keep the resume strictly under 1 page.
+- Add or modify bullets to ensure **≥95% keyword match** with the job description.
+- Inject new bullet points that match JD responsibilities, tools, and impact — even if not in original resume.
+- Emphasize quantifiable outcomes (“reduced latency by 20%”, “cut cost by $30K”, etc.)
+- Ensure the final output:
+  - **compiles cleanly in LaTeX**
+  - **has no textbackslash artifacts**
+  - **includes all original resume commands intact**
 
 Job Description:
 {jd_text}
 
-Resume:
-{resume_text}
+Editable Resume Content:
+{editable_text}
+"""
+            }
+        ]
+    )
 
-"""},
-    ])
-    tailored_latex = response.choices[0].message.content
-    tailored_latex = tailored_latex.strip().removeprefix("```latex").removesuffix("```").strip()
-    diff=get_unique_word_diff(tailored_latex,jd_text)
-    print(diff)
+    tailored_body = response.choices[0].message.content.strip()
+    tailored_body = tailored_body.removeprefix("```latex").removesuffix("```").strip()
+
+    # Optional diff check
+    diff = get_unique_word_diff(tailored_body, jd_text)
+
+    file_only = os.path.basename(output_file)
+    output_file = f"resumes/{safe_filename(file_only)}"
+
+    # Clean and prepare final LaTeX output
+    tailored_body = escape_latex(tailored_body)
+    tailored_body = clean_latex_response(tailored_body)
+    tailored_body = tailored_body.replace(r"\textbackslash{}", "\\")
+    tailored_body = tailored_body.replace(r"\\$", r"\$")  # fix double-escaped dollar signs
+    if r"\end{document}" not in tailored_body:
+        tailored_body += "\n\\end{document}"
+
+    full_resume = preserved_text + "\n" + tailored_body
+
     with open(f"{output_file}", "w") as f:
-        f.write(tailored_latex)
+        f.write(full_resume)
+
+    return output_file
 
 
+
+def safe_filename(text):
+    return re.sub(r'[^\w\-_.() ]', '', text).replace(" ", "_")
 
 def compile_pdf(tex_file_path, cleanup_aux_files=True):
     """
@@ -100,7 +181,7 @@ def compile_pdf(tex_file_path, cleanup_aux_files=True):
     tex_filename = os.path.join("/home/manthan/portfolio/job_search/", tex_file_path)
     pdf_filename = tex_file_path.replace(".tex", ".pdf")
     pdf_path = os.path.join("/home/manthan/portfolio/job_search", pdf_filename)
-    print(pdf_path)
+    print(pdf_path,tex_filename)
     try:
         result = subprocess.run(
             ["pdflatex", "-interaction=nonstopmode", tex_filename],
