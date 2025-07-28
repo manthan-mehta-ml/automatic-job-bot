@@ -31,7 +31,7 @@ for job in jobs:
         continue
 
     # Filter out jobs not related to MLE, Data Scientist, or AI Engineer
-    relevant_keywords = ["mle", "data scientist", "ai engineer", "machine learning engineer", "artificial intelligence engineer"]
+    relevant_keywords = ["mle", "data scientist", "ai engineer", "machine learning engineer", "artificial intelligence engineer","ai","data science","mlops"]
     if not any(keyword in role.lower() for keyword in relevant_keywords):
         print(f"Skipping job '{role}' as it's not related to relevant keywords.")
         continue
@@ -47,7 +47,7 @@ for job in jobs:
 
     # 2. Tailor resume
     tailored_tex_path = f"resumes/{company}_{role}_resume.tex"
-    tailor_resume(jd, original_tex_file="resumes/base_resume.tex", output_file=tailored_tex_path)
+    tailored_tex_path=tailor_resume(jd, original_tex_file="resumes/base_resume.tex", output_file=tailored_tex_path)
     print("tailoring done")
 
     # 3. Compile PDF
@@ -68,8 +68,7 @@ for job in jobs:
 
     # 4. Employee search
     employee_names = find_employees(company)
-    print("Employees found",employee_names)
-    # print(employee_names)
+    # print("Employees found",employee_names)
     print("employees found")
     
     # 5. Infer and dedupe emails
